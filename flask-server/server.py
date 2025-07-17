@@ -2,14 +2,14 @@ import time
 import random
 import logging
 import os
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from dotenv import load_dotenv
-import google.generativeai as genai
 import asyncio
 import concurrent.futures
 import json
 from datetime import datetime, timedelta
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from dotenv import load_dotenv
+import google.generativeai as genai
 
 user_attempts = {}  # { "user_id": attempt_count }
 MAX_ATTEMPTS = 3
@@ -391,8 +391,7 @@ def increment_attempt(user_id):
     user_attempts[user_id] = current + 1
     return jsonify({ "attempt": user_attempts[user_id] })
 
-
 if __name__ == '__main__':
     logging.info("🚀 Starting AI Question Generator Server...")
     logging.info(f"📊 Cache expiry: {CACHE_EXPIRY}")
-    app.run(port=5000, debug=True, threaded=True) 
+    app.run(port=5000, debug=True, threaded=True)

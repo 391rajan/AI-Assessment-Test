@@ -1,6 +1,5 @@
 const User = require("../models/user-model");
-const Contact = require("../models/contact-model"); 
-
+const Contact = require("../models/contact-model");
 
 // Register a new user
 const register = async (req, res) => {

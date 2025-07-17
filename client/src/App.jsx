@@ -33,7 +33,6 @@ function App() {
 
 </a>
 
-
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Index />} />
@@ -47,19 +46,17 @@ function App() {
           <Route path="/hr/monitor-tests" element={<MonitorTests />} />
           <Route path="/hr/reports" element={<Reports />} />
           <Route path="/hr/test-results/:testId" element={<TestResults />} />
-
           {/* Candidate Routes */}
           <Route path="/candidate/dashboard" element={<CandidateDashboard />} />
           <Route path="/candidate/start-test" element={<StartTest />} />
           <Route path="/candidate/take-test/:testId" element={<TakeTest />} />
           <Route path="/candidate/results" element={<PreviousResults />} />
-            <Route path="/candidate/results/:attemptId" element={<TestResultDetail />} />
+          <Route path="/candidate/results/:attemptId" element={<TestResultDetail />} />
           
 
           {/* Not Found */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-
         <Toaster />
       </AuthProvider>
     </BrowserRouter>

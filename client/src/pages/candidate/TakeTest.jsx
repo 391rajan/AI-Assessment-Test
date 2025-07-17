@@ -70,9 +70,6 @@ const TakeTest = () => {
   const [showFaceScanInfo, setShowFaceScanInfo] = useState(true);
   const [violations, setViolations] = useState([]);
   const [authChecked, setAuthChecked] = useState(false);
-  const [attemptCount, setAttemptCount] = useState(0);
-  const [maxAttemptReached, setMaxAttemptReached] = useState(false);
-
 
   // Fetch test data
   useEffect(() => {
@@ -93,12 +90,12 @@ const TakeTest = () => {
         console.log("🔍 Test response:", response);
         console.log("🔍 Test data:", response.test);
         console.log("🔍 Questions:", response.test.questions);
-
+        
         if (response.test.questions && response.test.questions.length > 0) {
           console.log("🔍 First question:", response.test.questions[0]);
           console.log("🔍 First question options:", response.test.questions[0].options);
         }
-
+        
         // Transform the test data to ensure compatibility
         const transformedTest = {
           ...response.test,
@@ -117,13 +114,13 @@ const TakeTest = () => {
               }
               return { id: oIndex + 1, text: `Option ${oIndex + 1}` };
             }) || [];
-
+            
             // Normalize question type
             let questionType = question.type;
             if (questionType === 'multiple-choice' || questionType === 'MCQ') {
               questionType = 'single-choice'; // Convert to single-choice for now
             }
-
+            
             return {
               ...question,
               id: question.id || question._id || `q_${qIndex}`,
@@ -133,13 +130,13 @@ const TakeTest = () => {
             };
           }) || []
         };
-
+        
         console.log("🔧 Transformed test:", transformedTest);
         console.log("🔧 Transformed questions:", transformedTest.questions);
         if (transformedTest.questions.length > 0) {
           console.log("🔧 Transformed first question:", transformedTest.questions[0]);
         }
-
+        
         setCurrentTest(transformedTest);
         setTimeRemaining((response.test.duration || 30) * 60);
       } catch (error) {
@@ -177,7 +174,7 @@ const TakeTest = () => {
   }, [authChecked, isAuthenticated, navigate, showFaceScanInfo]);
 
   const currentQuestion = currentTest?.questions?.[currentQuestionIndex];
-
+  
   // Debug logging
   React.useEffect(() => {
     if (currentQuestion) {
@@ -187,18 +184,18 @@ const TakeTest = () => {
       console.log("🎯 Question text:", currentQuestion.text);
     }
   }, [currentQuestion]);
-
-  const progress = currentTest?.questions?.length
-    ? ((currentQuestionIndex + 1) / currentTest.questions.length) * 100
+  
+  const progress = currentTest?.questions?.length 
+    ? ((currentQuestionIndex + 1) / currentTest.questions.length) * 100 
     : 0;
 
   const handleSubmitTest = useCallback(async () => {
     if (!currentTest) return;
-
+    
     // Calculate score (basic implementation)
     let score = 0;
     const totalQuestions = currentTest.questions.length;
-
+    
     currentTest.questions.forEach(question => {
       const userAnswer = answers[question.id];
       if (question.type === 'single-choice' && userAnswer === question.correctAnswer) {
@@ -206,17 +203,17 @@ const TakeTest = () => {
       } else if (question.type === 'multiple-choice' && question.correctAnswers) {
         const userAnswers = userAnswer || [];
         const correctAnswers = question.correctAnswers;
-        if (userAnswers.length === correctAnswers.length &&
-          userAnswers.every(ans => correctAnswers.includes(ans))) {
+        if (userAnswers.length === correctAnswers.length && 
+            userAnswers.every(ans => correctAnswers.includes(ans))) {
           score++;
         }
       }
     });
-
+    
     const finalScore = Math.round((score / totalQuestions) * 100);
-
+    
     const result = await submitTest(currentTest._id || currentTest.id, answers, finalScore);
-
+    
     if (result.success) {
       setIsTestCompleted(true);
     }
@@ -256,71 +253,10 @@ const TakeTest = () => {
       .padStart(2, "0")}`;
   };
 
-  // Attempt Count
-  const checkAttempts = async () => {
-    const userId = localStorage.getItem("user_id");
-    if (!userId) return;
-
-    try {
-      const res = await fetch(`http://localhost:5000/api/get_attempt/${userId}`);
-      const data = await res.json();
-
-      setAttemptCount(data.attempt || 0);
-      setMaxAttemptReached(data.attempt >= 3);
-
-      if (data.attempt >= 3) {
-        toast({
-          variant: "destructive",
-          title: "Attempt Limit Reached",
-          description: "You have already attempted this test 3 times.",
-        });
-        navigate("/candidate/dashboard");
-      }
-    } catch (error) {
-      console.error("❌ Error checking attempt count:", error);
-    }
+  const handleStartTest = () => {
+    setIsTestStarted(true);
+    setShowFaceScanInfo(false);
   };
-  useEffect(() => {
-    checkAttempts(); // ✅ This will trigger attempt check when component loads
-  }, []);
-
-  const handleStartTest = async () => {
-    const userId = localStorage.getItem("user_id"); // Adjust as needed
-    if (!userId) return;
-
-    try {
-      const res = await fetch(`http://localhost:5000/api/increment_attempt/${userId}`, {
-        method: "POST",
-      });
-
-      if (res.status === 403) {
-        const data = await res.json();
-        toast({
-          variant: "destructive",
-          title: "Cannot Start Test",
-          description: data.error || "Max attempts reached.",
-        });
-        return navigate("/candidate/dashboard");
-      }
-
-      setIsTestStarted(true);
-      setShowFaceScanInfo(false);
-    } catch (err) {
-      console.error("❌ Failed to increment attempt:", err);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not start test. Please try again.",
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (maxAttemptReached && !isTestStarted) {
-      navigate("/candidate/dashboard");
-    }
-  }, [maxAttemptReached, isTestStarted, navigate]);
-
 
   const handleSingleChoiceAnswer = (value) => {
     setAnswers((prev) => ({
@@ -503,16 +439,6 @@ const TakeTest = () => {
                 <Button className="w-full" onClick={handleStartTest}>
                   Start Test
                 </Button>
-                <p className="text-sm text-muted-foreground text-center">
-                  Attempt: {attemptCount}/3
-                </p>
-
-                {maxAttemptReached && (
-                  <p className="text-sm text-red-500 text-center font-medium">
-                    ❌ You have reached the maximum number of attempts.
-                  </p>
-                )}
-
               </div>
             </div>
           </CardContent>
@@ -534,8 +460,9 @@ const TakeTest = () => {
           <div className="flex items-center space-x-2">
             <Timer className="h-5 w-5 text-muted-foreground" />
             <span
-              className={`font-medium ${timeRemaining < 300 ? "text-destructive" : ""
-                }`}
+              className={`font-medium ${
+                timeRemaining < 300 ? "text-destructive" : ""
+              }`}
             >
               {formatTime(timeRemaining)}
             </span>
@@ -567,22 +494,22 @@ const TakeTest = () => {
                   {(() => {
                     console.log("🎯 Rendering single-choice options:", currentQuestion.options);
                     return currentQuestion.options?.map((option) => (
-                      <div
-                        key={option.id}
-                        className="flex items-center space-x-2"
+                    <div
+                      key={option.id}
+                      className="flex items-center space-x-2"
+                    >
+                      <RadioGroupItem
+                        value={option.id.toString()}
+                        id={`option-${option.id}`}
+                      />
+                      <label
+                        htmlFor={`option-${option.id}`}
+                        className="text-base cursor-pointer w-full"
                       >
-                        <RadioGroupItem
-                          value={option.id.toString()}
-                          id={`option-${option.id}`}
-                        />
-                        <label
-                          htmlFor={`option-${option.id}`}
-                          className="text-base cursor-pointer w-full"
-                        >
-                          {option.text}
-                        </label>
-                      </div>
-                    ));
+                        {option.text}
+                      </label>
+                    </div>
+                  ));
                   })()}
                 </RadioGroup>
               )}
@@ -592,27 +519,27 @@ const TakeTest = () => {
                   {(() => {
                     console.log("🎯 Rendering multiple-choice options:", currentQuestion.options);
                     return currentQuestion.options?.map((option) => (
-                      <div
-                        key={option.id}
-                        className="flex items-center space-x-2"
+                    <div
+                      key={option.id}
+                      className="flex items-center space-x-2"
+                    >
+                      <Checkbox
+                        id={`option-${option.id}`}
+                        checked={(answers[currentQuestion.id] || []).includes(
+                          option.id
+                        )}
+                        onCheckedChange={(checked) =>
+                          handleMultipleChoiceAnswer(option.id, !!checked)
+                        }
+                      />
+                      <label
+                        htmlFor={`option-${option.id}`}
+                        className="text-base cursor-pointer w-full"
                       >
-                        <Checkbox
-                          id={`option-${option.id}`}
-                          checked={(answers[currentQuestion.id] || []).includes(
-                            option.id
-                          )}
-                          onCheckedChange={(checked) =>
-                            handleMultipleChoiceAnswer(option.id, !!checked)
-                          }
-                        />
-                        <label
-                          htmlFor={`option-${option.id}`}
-                          className="text-base cursor-pointer w-full"
-                        >
-                          {option.text}
-                        </label>
-                      </div>
-                    ));
+                        {option.text}
+                      </label>
+                    </div>
+                  ));
                   })()}
                 </div>
               )}

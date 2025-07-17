@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middlewares/auth-middleware");
-
+//
 const {
   getMonitoredTests,
   createTest,
@@ -9,6 +9,8 @@ const {
   assignTestToCandidates,
   getTestAssignments,
   toggleTestPublish,
+  getTestReports,
+  getTestResults,
 } = require("../controllers/hr-controller");
 
 // ✅ Route to monitor candidates
@@ -28,5 +30,11 @@ router.get("/test-assignments/:testId", authMiddleware, getTestAssignments);
 
 // ✅ Route to toggle test publish status
 router.post("/toggle-publish/:testId", authMiddleware, toggleTestPublish);
+
+// ✅ Route to get test reports with completion data
+router.get("/test-reports", authMiddleware, getTestReports);
+
+// ✅ Route to get detailed results for a specific test
+router.get("/test-results/:testId", authMiddleware, getTestResults);
 
 module.exports = router;

@@ -8,7 +8,7 @@ const getAuthHeaders = () => {
     ...(token && { Authorization: `Bearer ${token}` }),
   };
 };
-
+//
 // Helper function to handle API responses
 const handleResponse = async (response) => {
   if (!response.ok) {
@@ -208,6 +208,50 @@ export const testsAPI = {
       headers: getAuthHeaders(),
     });
     return handleResponse(response);
+  },
+
+  // Get test reports with completion data
+  getTestReports: async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/hr/test-reports`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return handleResponse(response);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out. Please try again.');
+      }
+      throw error;
+    }
+  },
+
+  // Get detailed results for a specific test
+  getTestResults: async (testId) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/hr/test-results/${testId}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return handleResponse(response);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out. Please try again.');
+      }
+      throw error;
+    }
   },
 };
 
