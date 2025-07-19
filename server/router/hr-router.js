@@ -11,10 +11,14 @@ const {
   toggleTestPublish,
   getTestReports,
   getTestResults,
+  getMonitorSessions, // <-- Add this import
 } = require("../controllers/hr-controller");
 
 // ✅ Route to monitor candidates
 router.get("/monitor", authMiddleware, getMonitoredTests);
+
+// ✅ Route to get live test sessions for monitoring (NEW)
+router.get("/monitor-sessions", authMiddleware, getMonitorSessions);
 
 // ✅ Route to save a test created by HR (including AI-generated)
 router.post("/create-test", authMiddleware, createTest);

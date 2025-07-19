@@ -1,9 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
-<<<<<<< HEAD
 .env
 node_modules
-=======
 # Python virtual environment
 venv/
->>>>>>> upstream/main

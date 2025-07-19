@@ -253,6 +253,15 @@ export const testsAPI = {
       throw error;
     }
   },
+
+  // Get live test sessions for monitoring (NEW)
+  getMonitorSessions: async () => {
+    const response = await fetch(`${API_BASE_URL}/hr/monitor-sessions`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
 };
 
 export default { testAPI, attemptAPI, testsAPI };

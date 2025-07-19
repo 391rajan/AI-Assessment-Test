@@ -474,6 +474,104 @@ const getTestResults = async (req, res) => {
   }
 };
 
+// ✅ GET /api/hr/monitor-sessions - Get candidate test sessions for monitoring
+const getMonitorSessions = async (req, res) => {
+  try {
+    // Get all candidates
+    const candidates = await User.find({ role: "candidate" }).select("_id name email");
+
+    // Get all test assignments and attempts
+    const assignments = await TestAssignment.find({}).populate("testId", "title category duration").lean();
+    const attempts = await Attempt.find({}).populate("testId", "title category duration").lean();
+
+    // Map candidateId to assignments and attempts
+    const assignmentMap = {};
+    assignments.forEach(a => {
+      if (!assignmentMap[a.candidateEmail]) assignmentMap[a.candidateEmail] = [];
+      assignmentMap[a.candidateEmail].push(a);
+    });
+
+    const attemptMap = {};
+    attempts.forEach(attempt => {
+      const candidateId = attempt.candidateId?.toString();
+      if (!attemptMap[candidateId]) attemptMap[candidateId] = [];
+      attemptMap[candidateId].push(attempt);
+    });
+
+    // Build session objects for frontend
+    const sessions = [];
+    for (const candidate of candidates) {
+      // Find assignments and attempts for this candidate
+      const candidateAssignments = assignmentMap[candidate.email] || [];
+      const candidateAttempts = attemptMap[candidate._id.toString()] || [];
+
+      // For each assignment, determine status
+      candidateAssignments.forEach(assignment => {
+        // Find corresponding attempt
+        const attempt = candidateAttempts.find(a => a.testId._id.toString() === assignment.testId._id.toString());
+        let status = "not-started";
+        let progress = 0;
+        let violations = 0;
+        let timeRemaining = assignment.testId.duration ? `${assignment.testId.duration} min` : "N/A";
+        let testName = assignment.testId.title;
+
+        if (attempt) {
+          if (attempt.status === "completed") {
+            status = "completed";
+            progress = 100;
+            timeRemaining = "0 min";
+          } else {
+            status = "active";
+            progress = 50; 
+          }
+        }
+
+        sessions.push({
+          id: `${candidate._id}_${assignment.testId._id}`,
+          candidateId: candidate._id,
+          name: candidate.name,
+          email: candidate.email,
+          testName,
+          status,
+          progress,
+          violations,
+          timeRemaining,
+        });
+      });
+
+      // If candidate has attempts for tests not assigned (edge case)
+      candidateAttempts.forEach(attempt => {
+        const alreadyIncluded = sessions.find(s => s.candidateId.toString() === candidate._id.toString() && s.testName === attempt.testId.title);
+        if (!alreadyIncluded) {
+          let status = attempt.status === "completed" ? "completed" : "active";
+          let progress = attempt.status === "completed" ? 100 : 50;
+          let violations = attempt?.violations || 0; // Placeholder if available in `Attempt`
+
+          let timeRemaining = attempt.testId.duration ? `${attempt.testId.duration} min` : "N/A";
+          let testName = attempt.testId.title;
+
+          sessions.push({
+            id: `${candidate._id}_${attempt.testId._id}`,
+            candidateId: candidate._id,
+            name: candidate.name,
+            email: candidate.email,
+            testName,
+            status,
+            progress,
+            violations,
+            timeRemaining,
+          });
+        }
+      });
+    }
+
+    res.status(200).json({ sessions });
+  } catch (error) {
+    console.error("❌ Error fetching monitor sessions:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 module.exports = {
   getMonitoredTests,
   createTest,
@@ -483,4 +581,5 @@ module.exports = {
   toggleTestPublish,
   getTestReports,
   getTestResults,
+  getMonitorSessions,
 };
