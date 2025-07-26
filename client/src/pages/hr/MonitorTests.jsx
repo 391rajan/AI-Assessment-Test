@@ -46,6 +46,33 @@ const MonitorTests = () => {
   const [selectedCategory, setSelectedCategory] = useState(""); // <-- Add category filter
 
   // Fetch all tests from backend
+  const [groupedCandidates, setGroupedCandidates] = useState({
+  pending: [],
+  active: [],
+  completed: [],
+});
+
+useEffect(() => {
+  const fetchGroupedAssignments = async () => {
+    try {
+      const res = await fetch("http://localhost:3000/api/tests/assignments/grouped-by-status", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to fetch grouped assignments");
+      const data = await res.json();
+      console.log("✅ Grouped candidates:", data);
+      setGroupedCandidates(data);
+    } catch (error) {
+      console.error("❌ Error fetching grouped assignments:", error);
+      toast({ title: "Failed to load candidates", variant: "destructive" });
+    }
+  };
+
+  fetchGroupedAssignments();
+}, [toast]);
+
   useEffect(() => {
     const fetchAllTests = async () => {
       try {
@@ -111,15 +138,19 @@ const MonitorTests = () => {
     );
   });
 
-  const activeCandidates = filteredCandidates.filter(
-    (c) => c.status === "active"
+const filterCandidates = (list) =>
+  list.filter(
+    (c) =>
+      (c.candidateName.toLowerCase().includes(search.toLowerCase()) ||
+       c.candidateEmail.toLowerCase().includes(search.toLowerCase()) ||
+       c.testTitle.toLowerCase().includes(search.toLowerCase())) &&
+      (!selectedCategory || c.testCategory?.toLowerCase() === selectedCategory)
   );
-  const pendingCandidates = filteredCandidates.filter(
-    (c) => c.status === "not-started"
-  );
-  const completedCandidates = filteredCandidates.filter(
-    (c) => c.status === "completed"
-  );
+
+const activeCandidates = filterCandidates(groupedCandidates.active);
+const pendingCandidates = filterCandidates(groupedCandidates.pending);
+const completedCandidates = filterCandidates(groupedCandidates.completed);
+
 
   const handleViewSession = (candidate) => {
     setSelectedCandidate(candidate);
@@ -157,269 +188,236 @@ const MonitorTests = () => {
     setTestName("");
   };
   return (
-    <DashboardLayout allowedRole="hr">
-      <div className="space-y-8">
+  <DashboardLayout allowedRole="hr">
+    <div className="space-y-8">
+      {/* 🔥 ADDED: Save Test input and button */}
+      <div className="flex items-center gap-2">
+        <Input
+          placeholder="Enter test name"
+          value={testName}
+          onChange={(e) => setTestName(e.target.value)}
+        />
+        <Button onClick={handleSaveTest}>Save Test</Button>
+      </div>
 
-        {/* 🔥 ADDED: Save Test input and button */}
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Enter test name"
-            value={testName}
-            onChange={(e) => setTestName(e.target.value)}
-          />
-          <Button onClick={handleSaveTest}>Save Test</Button>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight">
-              Monitor Live Tests
-            </h1>
-            <p className="text-muted-foreground">
-              Track progress and monitor candidate behavior during assessments
-            </p>
-          </div>
-        </div>
-        {/* Search and filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search candidates or tests..."
-              className="pl-8"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {CATEGORY_OPTIONS.map((cat) => (
-              <Badge
-                key={cat.value}
-                variant={selectedCategory === cat.value ? "default" : "outline"}
-                className={
-                  selectedCategory === cat.value
-                    ? "bg-primary text-white"
-                    : "hover:bg-muted/50"
-                }
-                onClick={() => setSelectedCategory(cat.value)}
-                style={{ cursor: "pointer" }}
-              >
-                {cat.label}
-              </Badge>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {/* Tests list (Active tab: published, Pending tab: draft) */}
-          <div className="md:col-span-1 space-y-4">
-            <Tabs defaultValue="active">
-              <TabsList className="grid grid-cols-3 w-full">
-                <TabsTrigger value="active">
-                  Active ({publishedTests.filter(filterByCategory).length})
-                </TabsTrigger>
-                <TabsTrigger value="pending">
-                  Pending ({draftTests.filter(filterByCategory).length})
-                </TabsTrigger>
-                <TabsTrigger value="completed">
-                  Completed ({completedCandidates.length})
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="active" className="space-y-4 mt-4">
-                {publishedTests.filter(filterByCategory).length === 0 ? (
-                  <div className="text-center p-4 border rounded-md">
-                    <p className="text-muted-foreground">
-                      No published tests available
-                    </p>
-                  </div>
-                ) : (
-                  publishedTests
-                    .filter(filterByCategory)
-                    .filter(test =>
-                      test.title.toLowerCase().includes(search.toLowerCase()) ||
-                      (test.category || "").toLowerCase().includes(search.toLowerCase())
-                    )
-                    .map((test) => (
-                      <Card
-                        key={test._id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setSelectedCandidate(test)}
-                      >
-                        <CardContent className="p-4 flex justify-between items-center">
-                          <div className="space-y-1">
-                            <div className="font-medium">{test.title}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {test.category}
-                            </div>
-                            <div className="flex items-center mt-1 gap-2">
-                              <Badge variant="outline" className="bg-sky-100 text-sky-800 px-2 py-1 rounded-full">
-                                Published
-                              </Badge>
-                              <span className="text-xs ml-2">
-                                {test.duration} min
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-xs font-medium">
-                              {test.questions?.length || 0} questions
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
-                )}
-              </TabsContent>
-
-              <TabsContent value="pending" className="space-y-4 mt-4">
-                {draftTests.filter(filterByCategory).length === 0 ? (
-                  <div className="text-center p-4 border rounded-md">
-                    <p className="text-muted-foreground">
-                      No draft tests available
-                    </p>
-                  </div>
-                ) : (
-                  draftTests
-                    .filter(filterByCategory)
-                    .filter(test =>
-                      test.title.toLowerCase().includes(search.toLowerCase()) ||
-                      (test.category || "").toLowerCase().includes(search.toLowerCase())
-                    )
-                    .map((test) => (
-                      <Card key={test._id}>
-                        <CardContent className="p-4">
-                          <div className="space-y-1">
-                            <div className="font-medium">{test.title}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {test.category}
-                            </div>
-                            <Badge variant="outline" className="mt-1 bg-amber-100 text-amber-800 px-2 py-1 rounded-full">
-                              Draft
-                            </Badge>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
-                )}
-              </TabsContent>
-
-              <TabsContent value="completed" className="space-y-4 mt-4">
-                {completedCandidates.length === 0 ? (
-                  <div className="text-center p-4 border rounded-md">
-                    <p className="text-muted-foreground">No completed tests</p>
-                  </div>
-                ) : (
-                  completedCandidates
-                    .filter(c =>
-                      !selectedCategory ||
-                      (c.testName && c.testName.toLowerCase().includes(selectedCategory))
-                    )
-                    .map((candidate) => (
-                      <Card key={candidate.id}>
-                        <CardContent className="p-4 flex justify-between items-center">
-                          <div className="space-y-1">
-                            <div className="font-medium">{candidate.name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {candidate.testName}
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className="bg-success/10 text-success mt-1"
-                            >
-                              Completed
-                            </Badge>
-                          </div>
-                          <Button size="sm" variant="outline">
-                            View Results
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))
-                )}
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          {/* Monitoring view */}
-          <div className="md:col-span-2">
-            {selectedCandidate ? (
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle>
-                        {selectedCandidate.title || selectedCandidate.name}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedCandidate.category || selectedCandidate.email}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          selectedCandidate.violations > 0
-                            ? "destructive"
-                            : "outline"
-                        }
-                      >
-                        {selectedCandidate.violations} Alert
-                        {selectedCandidate.violations !== 1 ? "s" : ""}
-                      </Badge>
-                      <Button size="sm" variant="outline" className="gap-1">
-                        <Eye className="h-3.5 w-3.5" />
-                        <span>View Full Screen</span>
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Live monitoring preview */}
-                  <div className="relative rounded-lg bg-black aspect-video overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <p className="text-white text-lg">
-                        Live monitoring feed would be displayed here
-                      </p>
-                    </div>
-                    <div className="absolute bottom-4 right-4 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                      {selectedCandidate.timeRemaining} remaining
-                    </div>
-                  </div>
-
-                  {/* Monitoring controls */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleFlagViolation(selectedCandidate.id)}
-                    >
-                      Flag Violation
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        handleInterveneToChatWithCandidate(selectedCandidate.id)
-                      }
-                    >
-                      Chat with Candidate
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="text-center p-4 border rounded-md">
-                <p className="text-muted-foreground">
-                  Select a test to view details
-                </p>
-              </div>
-            )}
-          </div>
+      <div className="flex justify-between items-center">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">
+            Monitor Live Tests
+          </h1>
+          <p className="text-muted-foreground">
+            Track progress and monitor candidate behavior during assessments
+          </p>
         </div>
       </div>
-    </DashboardLayout>
-  );
-};
 
+      {/* Search and filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search candidates or tests..."
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {CATEGORY_OPTIONS.map((cat) => (
+            <Badge
+              key={cat.value}
+              variant={selectedCategory === cat.value ? "default" : "outline"}
+              className={
+                selectedCategory === cat.value
+                  ? "bg-primary text-white"
+                  : "hover:bg-muted/50"
+              }
+              onClick={() => setSelectedCategory(cat.value)}
+              style={{ cursor: "pointer" }}
+            >
+              {cat.label}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-8">
+        {/* Tests list (Tabs) */}
+        <div className="md:col-span-1 space-y-4">
+          <Tabs defaultValue="active">
+            <TabsList className="grid grid-cols-3 w-full">
+              <TabsTrigger value="active">
+                Active ({activeCandidates.length})
+              </TabsTrigger>
+              <TabsTrigger value="pending">
+                Pending ({pendingCandidates.length})
+              </TabsTrigger>
+              <TabsTrigger value="completed">
+                Completed ({completedCandidates.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="active" className="space-y-4 mt-4">
+              {activeCandidates.length === 0 ? (
+                <div className="text-center p-4 border rounded-md">
+                  <p className="text-muted-foreground">No active tests</p>
+                </div>
+              ) : (
+                activeCandidates.map((candidate) => (
+                  <Card
+                    key={candidate._id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setSelectedCandidate(candidate)}
+                  >
+                    <CardContent className="p-4 flex justify-between items-center">
+                      <div className="space-y-1">
+                        <div className="font-medium">{candidate.candidateName}</div>
+                        <div className="text-sm text-muted-foreground">{candidate.testTitle}</div>
+                        <div className="flex items-center mt-1 gap-2">
+                          <Badge variant="outline" className="bg-sky-100 text-sky-800 px-2 py-1 rounded-full">
+                            Active
+                          </Badge>
+                          <span className="text-xs ml-2">{candidate.testDuration} min</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs font-medium">
+                          {candidate.totalQuestions || 0} questions
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="pending" className="space-y-4 mt-4">
+              {pendingCandidates.length === 0 ? (
+                <div className="text-center p-4 border rounded-md">
+                  <p className="text-muted-foreground">No pending tests</p>
+                </div>
+              ) : (
+                pendingCandidates.map((candidate) => (
+                  <Card key={candidate._id}>
+                    <CardContent className="p-4">
+                      <div className="space-y-1">
+                        <div className="font-medium">{candidate.candidateName}</div>
+                        <div className="text-sm text-muted-foreground">{candidate.testTitle}</div>
+                        <Badge variant="outline" className="mt-1 bg-amber-100 text-amber-800 px-2 py-1 rounded-full">
+                          Pending
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="completed" className="space-y-4 mt-4">
+              {completedCandidates.length === 0 ? (
+                <div className="text-center p-4 border rounded-md">
+                  <p className="text-muted-foreground">No completed tests</p>
+                </div>
+              ) : (
+                completedCandidates.map((candidate) => (
+                  <Card key={candidate._id}>
+                    <CardContent className="p-4 flex justify-between items-center">
+                      <div className="space-y-1">
+                        <div className="font-medium">{candidate.candidateName}</div>
+                        <div className="text-sm text-muted-foreground">{candidate.testTitle}</div>
+                        <Badge variant="outline" className="bg-success/10 text-success mt-1">
+                          Completed
+                        </Badge>
+                      </div>
+                      <Button size="sm" variant="outline">
+                        View Results
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Monitoring view */}
+        <div className="md:col-span-2">
+          {selectedCandidate ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>
+                      {selectedCandidate.title || selectedCandidate.name}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedCandidate.category || selectedCandidate.email}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        selectedCandidate.violations > 0
+                          ? "destructive"
+                          : "outline"
+                      }
+                    >
+                      {selectedCandidate.violations} Alert
+                      {selectedCandidate.violations !== 1 ? "s" : ""}
+                    </Badge>
+                    <Button size="sm" variant="outline" className="gap-1">
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>View Full Screen</span>
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Live monitoring preview */}
+                <div className="relative rounded-lg bg-black aspect-video overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-white text-lg">
+                      Live monitoring feed would be displayed here
+                    </p>
+                  </div>
+                  <div className="absolute bottom-4 right-4 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                    {selectedCandidate.timeRemaining} remaining
+                  </div>
+                </div>
+
+                {/* Monitoring controls */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleFlagViolation(selectedCandidate.id)}
+                  >
+                    Flag Violation
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleInterveneToChatWithCandidate(selectedCandidate.id)
+                    }
+                  >
+                    Chat with Candidate
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="text-center p-4 border rounded-md">
+              <p className="text-muted-foreground">
+                Select a test to view details
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </DashboardLayout>
+);
+}
 export default MonitorTests;

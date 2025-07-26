@@ -253,10 +253,45 @@ const TakeTest = () => {
       .padStart(2, "0")}`;
   };
 
-  const handleStartTest = () => {
-    setIsTestStarted(true);
-    setShowFaceScanInfo(false);
-  };
+  // client/src/pages/candidate/TakeTest.jsx
+
+const handleStartTest = async () => {
+  
+  try {
+    const response = await fetch(
+      `http://localhost:3000/api/tests/${testId}/start`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    if (response.ok) {
+      setIsTestStarted(true);
+      setShowFaceScanInfo(false);
+      toast({
+        title: "Test started!",
+        description: "Good luck!",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not start the test.",
+        variant: "destructive",
+      });
+    }
+  } catch (error) {
+    console.error("Failed to start test:", error);
+    toast({
+      title: "Error",
+      description: "An error occurred while starting the test.",
+      variant: "destructive",
+    });
+  }
+};
 
   const handleSingleChoiceAnswer = (value) => {
     setAnswers((prev) => ({
