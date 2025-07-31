@@ -14,8 +14,6 @@ const {
   getAllPublishedTests,
   getTestByToken,
   clearCache,
-  startTestAndCreateAssignment,
-  getAssignmentsGroupedByStatus,
 } = require("../controllers/test-controller");
 
 router.post("/create", authMiddleware, createTest);
@@ -28,9 +26,6 @@ router.get("/:id", authMiddleware, getTestById);
 router.post("/:testId/submit", authMiddleware, submitAttempt);
 router.get("/candidate/:candidateId", authMiddleware, getCandidateAttempts);
 router.get("/attempts/all", authMiddleware, getAllAttempts);
-router.post("/:testId/start", authMiddleware, startTestAndCreateAssignment);
-router.get("/assignments/grouped-by-status", authMiddleware, getAssignmentsGroupedByStatus);
-
 
 // ✅ Route to access test by token (public access for invited candidates)
 router.get("/by-token/:token", getTestByToken);

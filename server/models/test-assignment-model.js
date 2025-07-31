@@ -24,7 +24,7 @@ const testAssignmentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "active", "completed"],
+      enum: ["pending", "started", "completed"],
       default: "pending"
     },
     invitationSent: {

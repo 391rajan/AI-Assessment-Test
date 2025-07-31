@@ -2,7 +2,6 @@ const Test = require("../models/test-model");
 const Attempt = require("../models/attempt-model");
 const TestAssignment = require("../models/test-assignment-model");
 const { testCache, attemptCache } = require("../utils/cache");
-const crypto = require("crypto");
 
 const createTest = async (req, res) => {
   try {
@@ -192,58 +191,49 @@ const getTestById = async (req, res) => {
 
 const submitAttempt = async (req, res) => {
   try {
-    const { testId } = req.params;
-    const candidateId = req.user._id;
-
     console.log("📝 Submitting test attempt:", {
-      testId,
-      candidateId,
+      testId: req.params.testId,
+      candidateId: req.user._id,
       score: req.body.score,
       answersCount: req.body.answers?.length || 0
     });
 
     // Check if user has already attempted this test
-    const existingAttempt = await Attempt.findOne({ testId, candidateId });
+    const existingAttempt = await Attempt.findOne({
+      testId: req.params.testId,
+      candidateId: req.user._id
+    });
 
     if (existingAttempt) {
       console.log("⚠️ User already attempted this test:", existingAttempt._id);
-      return res.status(409).json({
+      return res.status(409).json({ 
         error: "You have already taken this test",
         existingAttemptId: existingAttempt._id
       });
     }
 
-    // Create the new attempt record
     const attempt = new Attempt({
-      testId,
-      candidateId,
+      testId: req.params.testId,
+      candidateId: req.user._id,
       answers: req.body.answers,
       score: req.body.score,
-      status: "completed",
-      submittedAt: new Date(),
+      status: "completed", // ✅ Mark as completed when submitted
+      submittedAt: new Date(), // ✅ Set submission timestamp
     });
-
+    
     await attempt.save();
     console.log("✅ Test attempt saved successfully:", attempt._id);
-
-    // ⭐️ UPDATE a a ssignment status to 'completed'
-    await TestAssignment.findOneAndUpdate(
-      { testId: testId, candidateId: candidateId },
-      { status: "completed" }
-    );
-    console.log("✅ Test assignment status updated to completed.");
-
-
-    // Invalidate cache after new attempt
+    
+    // 🚀 Performance: Invalidate cache after new attempt
     const availableTestsCacheKey = `available_tests_${req.user._id}`;
     const dashboardTestsCacheKey = `dashboard_tests_${req.user._id}`;
     const attemptsCacheKey = `my_attempts_${req.user._id}`;
     testCache.delete(availableTestsCacheKey);
-    testCache.delete(dashboardTestsCacheKey);
+    testCache.delete(dashboardTestsCacheKey); // ✅ Also clear dashboard cache
     attemptCache.delete(attemptsCacheKey);
-
-    res.status(201).json({
-      message: "Test submitted successfully",
+    
+    res.status(201).json({ 
+      message: "Test submitted successfully", 
       attempt: {
         _id: attempt._id,
         testId: attempt.testId,
@@ -251,20 +241,24 @@ const submitAttempt = async (req, res) => {
         status: attempt.status,
         submittedAt: attempt.submittedAt
       },
-      refreshDashboard: true
+      refreshDashboard: true // Flag to indicate dashboard should refresh
     });
   } catch (error) {
     console.error("❌ Error submitting attempt:", error);
+    
+    // Handle duplicate key error (in case the unique index catches it)
     if (error.code === 11000) {
-      return res.status(409).json({ error: "You have already taken this test" });
+      return res.status(409).json({ 
+        error: "You have already taken this test" 
+      });
     }
-    res.status(500).json({
+    
+    res.status(500).json({ 
       error: "Failed to submit test attempt",
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
-
 
 const getCandidateAttempts = async (req, res) => {
   try {
@@ -492,90 +486,6 @@ const clearCache = async (req, res) => {
   }
 };
 
-
-const startTestAndCreateAssignment = async (req, res) => {
-  try {
-    const { testId } = req.params;
-    const candidate = req.user; // from authMiddleware
-
-    // 1. Check if an assignment for this test and candidate already exists
-    const existingAssignment = await TestAssignment.findOne({
-      testId: testId,
-      candidateId: candidate._id,
-    });
-
-    if (existingAssignment) {
-      // If it exists and is already active or completed, prevent starting again
-      if (existingAssignment.status === "active" || existingAssignment.status === "completed") {
-        return res.status(409).json({ message: "You have already started or completed this test." });
-      }
-      // If pending, just update to active
-      existingAssignment.status = "active";
-      await existingAssignment.save();
-      return res.status(200).json({ message: "Test resumed successfully.", assignment: existingAssignment });
-    }
-
-    // 2. If no assignment exists, create one. First, get the test creator's ID.
-    const test = await Test.findById(testId).select('createdBy');
-    if (!test) {
-      return res.status(404).json({ message: "Test not found." });
-    }
-
-    // 3. Create the new assignment document
-    const newAssignment = new TestAssignment({
-      testId: testId,
-      candidateEmail: candidate.email,
-      candidateId: candidate._id,
-      assignedBy: test.createdBy, // The test creator is the assigner
-      status: "active", // Set status directly to active
-      accessToken: crypto.randomBytes(32).toString('hex'), // Generate a unique token
-    });
-
-    await newAssignment.save();
-
-    res.status(201).json({ message: "Test started and assignment created.", assignment: newAssignment });
-
-  } catch (error) {
-    console.error("Error starting test and creating assignment:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-};
-
-
-const getAssignmentsGroupedByStatus = async (req, res) => {
-  try {
-    const assignments = await TestAssignment.find({ assignedBy: req.user._id }) // Only show for HR
-      .populate("candidateId", "name email")
-      .populate("testId", "title category");
-
-    const grouped = {
-      pending: [],
-      active: [],
-      completed: []
-    };
-
-    assignments.forEach(assignment => {
-      const status = assignment.status;
-      const group = grouped[status];
-      if (group) {
-        group.push({
-          candidateName: assignment.candidateId?.name || assignment.candidateEmail,
-          candidateEmail: assignment.candidateEmail,
-          testTitle: assignment.testId?.title || "Unknown",
-          testCategory: assignment.testId?.category || "General",
-          status,
-          assignmentId: assignment._id
-        });
-      }
-    });
-
-    res.status(200).json(grouped);
-  } catch (err) {
-    console.error("❌ Error fetching grouped assignments:", err);
-    res.status(500).json({ error: "Failed to fetch assignments" });
-  }
-};
-
 module.exports = {
   createTest,
   getAllTests, // ✅ needed for test-router.js
@@ -590,7 +500,5 @@ module.exports = {
   getHrCreatedTests: getAllTests, // ✅ reused in HR dashboard
   getTestByToken,
   clearCache, // ✅ debug function
-  startTestAndCreateAssignment,
-  getAssignmentsGroupedByStatus
 };
 
