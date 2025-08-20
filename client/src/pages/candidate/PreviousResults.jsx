@@ -36,31 +36,47 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useTestAttempts } from "@/hooks/useTests";
+import { useTestAttempts } from "@/hooks/useTest";
 
 // Helper function to transform API attempts data
 const transformAttemptData = (attempts) => {
-  return attempts.map(attempt => ({
-    id: attempt._id,
-    title: attempt.testId?.title || "Unknown Test",
-    category: attempt.testId?.category || "General",
-    dateTaken: new Date(attempt.createdAt).toISOString().split('T')[0],
-    score: attempt.score || 0,
-    percentile: Math.floor(Math.random() * 100), // Mock percentile for now
-    questions: attempt.testId?.questions?.length || 0,
-    correct: Math.floor((attempt.score / 100) * (attempt.testId?.questions?.length || 0)),
-    incorrect: Math.floor(((100 - attempt.score) / 100) * (attempt.testId?.questions?.length || 0)),
-    skipped: 0, // Mock data
-    breakdown: [
-      { category: "General Knowledge", score: attempt.score },
-    ],
-    detailedFeedback: `You scored ${attempt.score}% on this test. ${
-      attempt.score >= 70 ? "Great job!" : 
-      attempt.score >= 50 ? "Good effort, keep improving!" : 
-      "Consider reviewing the material and trying again."
-    }`,
-  }));
+  return attempts.map(attempt => {
+    // Safely handle date
+    let dateTaken = "N/A";
+    if (attempt.submittedAt) {
+      const dateObj = new Date(attempt.submittedAt);
+      dateTaken = isNaN(dateObj) ? "N/A" : dateObj.toISOString().split('T')[0];
+    } else if (attempt.createdAt) {
+      const dateObj = new Date(attempt.createdAt);
+      dateTaken = isNaN(dateObj) ? "N/A" : dateObj.toISOString().split('T')[0];
+    }
+
+    const questionsCount = attempt.testId?.questions?.length || 0;
+    const score = attempt.score || 0;
+
+    return {
+      id: attempt._id,
+      title: attempt.testId?.title || "Unknown Test",
+      category: attempt.testId?.category || "General",
+      dateTaken,
+      score,
+      percentile: Math.floor(Math.random() * 100), // Mock percentile for now
+      questions: questionsCount,
+      correct: Math.floor((score / 100) * questionsCount),
+      incorrect: Math.floor(((100 - score) / 100) * questionsCount),
+      skipped: 0, // Mock data
+      breakdown: [
+        { category: "General Knowledge", score: score },
+      ],
+      detailedFeedback: `You scored ${score}% on this test. ${
+        score >= 70 ? "Great job!" :
+        score >= 50 ? "Good effort, keep improving!" :
+        "Consider reviewing the material and trying again."
+      }`,
+    };
+  });
 };
+
 
 // Generate progress data from attempts
 const generateProgressData = (attempts) => {
@@ -487,5 +503,12 @@ Generated on: ${new Date().toLocaleString()}
     </DashboardLayout>
   );
 };
+ 
 
 export default PreviousResults;
+
+
+
+
+
+
