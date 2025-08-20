@@ -41,7 +41,6 @@ import { useTestAttempts } from "@/hooks/useTest";
 // Helper function to transform API attempts data
 const transformAttemptData = (attempts) => {
   return attempts.map(attempt => {
-    // Safely handle date
     let dateTaken = "N/A";
     if (attempt.submittedAt) {
       const dateObj = new Date(attempt.submittedAt);
