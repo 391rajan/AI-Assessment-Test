@@ -38,6 +38,12 @@ import {
 } from "@/components/ui/collapsible";
 import { useTestAttempts } from "@/hooks/useTest";
 
+// ===============================
+// Component: PreviousResults
+// Description: Displays test history, performance analytics,
+// progress trends, and recommendations for candidates.
+// ===============================
+
 // Helper function to transform API attempts data
 const transformAttemptData = (attempts) => {
   return attempts.map(attempt => {
